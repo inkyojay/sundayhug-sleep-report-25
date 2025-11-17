@@ -168,10 +168,18 @@ async function analyzeSleepEnvironment(imageBase64, imageMimeType, birthDate) {
 /**
  * POST /api/analyze
  * 이미지 분석 API (n8n 연동용)
+ * 
+ * Request Body:
+ * {
+ *   "imageBase64": "data:image/jpeg;base64,...",
+ *   "birthDate": "2024-01-15",
+ *   "phoneNumber": "010-1234-5678" (선택사항),
+ *   "instagramId": "@instagram_id" (선택사항)
+ * }
  */
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { imageBase64, birthDate } = req.body;
+    const { imageBase64, birthDate, phoneNumber, instagramId } = req.body;
 
     // 입력 검증
     if (!imageBase64) {
@@ -207,10 +215,14 @@ app.post('/api/analyze', async (req, res) => {
       birthDate
     );
 
-    // 성공 응답
+    // 성공 응답 (전화번호와 인스타그램 ID 포함)
     res.json({
       success: true,
-      data: analysisResult
+      data: {
+        ...analysisResult,
+        phoneNumber: phoneNumber || null,
+        instagramId: instagramId || null
+      }
     });
 
   } catch (error) {
@@ -225,10 +237,18 @@ app.post('/api/analyze', async (req, res) => {
 /**
  * POST /api/analyze-and-save
  * 이미지 분석 후 Supabase에 저장 (n8n 연동용)
+ * 
+ * Request Body:
+ * {
+ *   "imageBase64": "data:image/jpeg;base64,...",
+ *   "birthDate": "2024-01-15",
+ *   "phoneNumber": "010-1234-5678" (선택사항),
+ *   "instagramId": "@instagram_id" (선택사항)
+ * }
  */
 app.post('/api/analyze-and-save', async (req, res) => {
   try {
-    const { imageBase64, birthDate } = req.body;
+    const { imageBase64, birthDate, phoneNumber, instagramId } = req.body;
 
     // 입력 검증
     if (!imageBase64 || !birthDate) {
@@ -267,7 +287,9 @@ app.post('/api/analyze-and-save', async (req, res) => {
         birth_date: birthDate,
         age_in_months: ageInMonths,
         summary: analysisResult.summary,
-        report_slides: null
+        report_slides: null,
+        phone_number: phoneNumber || null,
+        instagram_id: instagramId || null
       })
       .select()
       .single();
