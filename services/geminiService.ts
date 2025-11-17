@@ -24,7 +24,12 @@ export async function analyzeSleepEnvironment(
   imageMimeType: string,
   birthDate: string
 ): Promise<AnalysisReport> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  // 환경 변수에서 API 키 가져오기 (서버 사이드용)
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY or API_KEY environment variable is not set');
+  }
+  const ai = new GoogleGenAI({ apiKey });
 
   const ageInMonths = calculateAgeInMonths(birthDate);
 
