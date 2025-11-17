@@ -156,10 +156,29 @@ async function analyzeSleepEnvironment(imageBase64, imageMimeType, birthDate) {
 
   } catch (error) {
     console.error("Error analyzing image with Gemini:", error);
+    console.error("Error details:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     if (error instanceof SyntaxError) {
       throw new Error("AI가 예상치 못한 형식으로 응답했습니다. 다시 시도해 주세요.");
     }
-    throw new Error("AI 분석에 실패했습니다. 이미지를 확인하고 다시 시도해 주세요.");
+    
+    // 더 자세한 에러 메시지 제공
+    const errorMessage = error.message || 'Unknown error';
+    if (errorMessage.includes('API key') || errorMessage.includes('authentication')) {
+      throw new Error("API 키 인증에 실패했습니다. 서버 설정을 확인해주세요.");
+    }
+    if (errorMessage.includes('invalid') || errorMessage.includes('format')) {
+      throw new Error("이미지 형식이 올바르지 않습니다. JPEG, PNG 형식의 이미지를 사용해주세요.");
+    }
+    if (errorMessage.includes('size') || errorMessage.includes('too large')) {
+      throw new Error("이미지 크기가 너무 큽니다. 더 작은 이미지를 사용해주세요.");
+    }
+    
+    throw new Error(`AI 분석에 실패했습니다: ${errorMessage}. 이미지를 확인하고 다시 시도해 주세요.`);
   }
 }
 
@@ -227,9 +246,19 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error('Analysis API Error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Request body:', {
+      hasImageBase64: !!req.body.imageBase64,
+      imageBase64Length: req.body.imageBase64?.length,
+      birthDate: req.body.birthDate,
+      phoneNumber: req.body.phoneNumber,
+      instagramId: req.body.instagramId
+    });
+    
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
