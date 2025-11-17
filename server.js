@@ -389,4 +389,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running at http://0.0.0.0:${PORT}/`);
   console.log(`📡 API endpoints available at http://0.0.0.0:${PORT}/api/`);
   console.log(`🔍 Health check: http://0.0.0.0:${PORT}/api/health`);
+  console.log(`🌐 Web app available at http://0.0.0.0:${PORT}/`);
 });
