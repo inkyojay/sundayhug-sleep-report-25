@@ -529,6 +529,70 @@ app.post('/api/analyze-and-save', async (req, res) => {
 });
 
 /**
+ * GET /api/analysis/:id/slides
+ * 분석 결과의 슬라이드 조회 (n8n 연동용)
+ * 
+ * URL 파라미터:
+ * - id: 분석 ID (analysisId)
+ */
+app.get('/api/analysis/:id/slides', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Analysis ID is required'
+      });
+    }
+
+    // Supabase에서 슬라이드 조회
+    const { data: analysis, error } = await supabase
+      .from('sleep_analyses')
+      .select('id, report_slides, instagram_id, phone_number, created_at')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      throw new Error(`슬라이드 조회 실패: ${error.message}`);
+    }
+
+    if (!analysis) {
+      return res.status(404).json({
+        success: false,
+        error: 'Analysis not found'
+      });
+    }
+
+    if (!analysis.report_slides || analysis.report_slides.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: '슬라이드가 아직 생성되지 않았습니다.'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        analysisId: analysis.id,
+        slides: analysis.report_slides, // Base64 문자열 배열
+        slideCount: analysis.report_slides.length,
+        instagramId: analysis.instagram_id,
+        phoneNumber: analysis.phone_number,
+        createdAt: analysis.created_at
+      }
+    });
+
+  } catch (error) {
+    console.error('슬라이드 조회 API 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    });
+  }
+});
+
+/**
  * GET /api/health
  * 헬스 체크 엔드포인트
  */
