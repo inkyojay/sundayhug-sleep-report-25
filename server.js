@@ -67,6 +67,86 @@ function calculateAgeInMonths(birthDate) {
   return months <= 0 ? 0 : months;
 }
 
+/**
+ * Supabase Storage에 이미지 업로드
+ * @param {Buffer} imageBuffer - 이미지 버퍼
+ * @param {string} fileName - 파일명 (예: "analysis-123-image.jpg")
+ * @param {string} mimeType - MIME 타입 (예: "image/jpeg")
+ * @param {string} bucketName - Storage 버킷 이름 (기본값: "sleep-analysis")
+ * @returns {Promise<string>} 공개 URL
+ */
+async function uploadImageToStorage(imageBuffer, fileName, mimeType, bucketName = 'sleep-analysis') {
+  try {
+    // 버킷이 없으면 생성 (에러 무시)
+    const { error: bucketError } = await supabase.storage.createBucket(bucketName, {
+      public: true,
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg'],
+      fileSizeLimit: 10485760 // 10MB
+    });
+    
+    // 버킷이 이미 존재하면 에러 무시
+    if (bucketError && !bucketError.message.includes('already exists')) {
+      console.warn('버킷 생성 경고:', bucketError.message);
+    }
+
+    // 파일 업로드
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, imageBuffer, {
+        contentType: mimeType,
+        upsert: true // 이미 있으면 덮어쓰기
+      });
+
+    if (error) {
+      throw new Error(`Storage 업로드 실패: ${error.message}`);
+    }
+
+    // 공개 URL 생성
+    const { data: urlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(fileName);
+
+    if (!urlData?.publicUrl) {
+      throw new Error('공개 URL 생성 실패');
+    }
+
+    console.log(`✅ 이미지 업로드 완료: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('❌ Storage 업로드 오류:', error);
+    throw error;
+  }
+}
+
+/**
+ * Supabase Storage에 슬라이드 배열 업로드
+ * @param {string[]} slideBase64Array - Base64 문자열 배열
+ * @param {string} analysisId - 분석 ID
+ * @param {string} bucketName - Storage 버킷 이름 (기본값: "sleep-analysis")
+ * @returns {Promise<string[]>} 공개 URL 배열
+ */
+async function uploadSlidesToStorage(slideBase64Array, analysisId, bucketName = 'sleep-analysis') {
+  try {
+    const slideUrls = [];
+
+    for (let i = 0; i < slideBase64Array.length; i++) {
+      const base64String = slideBase64Array[i];
+      const imageBuffer = Buffer.from(base64String, 'base64');
+      const fileName = `slides/${analysisId}/slide-${i + 1}.png`;
+      
+      const url = await uploadImageToStorage(imageBuffer, fileName, 'image/png', bucketName);
+      slideUrls.push(url);
+      
+      console.log(`✅ 슬라이드 ${i + 1}/${slideBase64Array.length} 업로드 완료`);
+    }
+
+    return slideUrls;
+  } catch (error) {
+    console.error('❌ 슬라이드 업로드 오류:', error);
+    throw error;
+  }
+}
+
 async function analyzeSleepEnvironment(imageBase64, imageMimeType, birthDate) {
   if (!ai) {
     throw new Error('GEMINI_API_KEY environment variable is not set');
@@ -346,7 +426,7 @@ app.post('/api/analyze-from-url', async (req, res) => {
       MIME타입: contentType
     });
     
-    // Base64로 변환
+    // Base64로 변환 (분석용)
     const base64String = buffer.toString('base64');
 
     // 분석 수행
@@ -358,27 +438,15 @@ app.post('/api/analyze-from-url', async (req, res) => {
 
     const ageInMonths = calculateAgeInMonths(birthDate);
 
-    // 슬라이드 생성
-    console.log('📊 슬라이드 생성 시작...');
-    let reportSlides = null;
-    try {
-      const slides = await generateAllSlides(analysisResult, base64String);
-      reportSlides = slides;
-      console.log(`✅ 슬라이드 생성 완료: ${slides.length}개`);
-    } catch (slideError) {
-      console.error('⚠️ 슬라이드 생성 실패:', slideError);
-      // 슬라이드 생성 실패해도 분석 결과는 저장
-    }
-
-    // Supabase에 저장
+    // 먼저 분석 결과 저장 (analysisId 필요)
     const { data: savedAnalysis, error: saveError } = await supabase
       .from('sleep_analyses')
       .insert({
-        image_base64: base64String,
+        image_base64: null, // Base64는 더 이상 저장하지 않음
         birth_date: birthDate,
         age_in_months: ageInMonths,
         summary: analysisResult.summary,
-        report_slides: reportSlides,
+        report_slides: null, // 나중에 URL 배열로 업데이트
         phone_number: phoneNumber || null,
         instagram_id: instagramId || null
       })
@@ -387,6 +455,20 @@ app.post('/api/analyze-from-url', async (req, res) => {
 
     if (saveError) {
       throw new Error(`데이터 저장 실패: ${saveError.message}`);
+    }
+
+    // 이미지를 Storage에 업로드
+    const imageFileName = `images/${savedAnalysis.id}/original.${contentType.split('/')[1]}`;
+    const uploadedImageUrl = await uploadImageToStorage(buffer, imageFileName, contentType);
+    
+    // 이미지 URL 업데이트
+    const { error: imageUrlError } = await supabase
+      .from('sleep_analyses')
+      .update({ image_url: uploadedImageUrl })
+      .eq('id', savedAnalysis.id);
+
+    if (imageUrlError) {
+      console.warn('이미지 URL 업데이트 실패:', imageUrlError.message);
     }
 
     // 피드백 항목 저장
@@ -613,7 +695,7 @@ app.post('/api/analysis/:id/generate-slides', async (req, res) => {
     // Supabase에서 분석 결과 조회
     const { data: analysis, error: fetchError } = await supabase
       .from('sleep_analyses')
-      .select('id, image_base64, summary')
+      .select('id, image_url, image_base64, summary')
       .eq('id', id)
       .single();
 
@@ -645,15 +727,38 @@ app.post('/api/analysis/:id/generate-slides', async (req, res) => {
       references: []
     };
 
+    // 이미지 Base64 가져오기 (Storage URL에서 다운로드 또는 기존 Base64 사용)
+    let imageBase64 = analysis.image_base64;
+    
+    if (!imageBase64 && analysis.image_url) {
+      // Storage에서 이미지 다운로드
+      console.log(`📥 Storage에서 이미지 다운로드: ${analysis.image_url}`);
+      const imageResponse = await fetch(analysis.image_url);
+      if (imageResponse.ok) {
+        const imageBuffer = await imageResponse.arrayBuffer();
+        imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      } else {
+        throw new Error(`이미지 다운로드 실패: ${imageResponse.status}`);
+      }
+    }
+
+    if (!imageBase64) {
+      throw new Error('이미지 데이터를 찾을 수 없습니다.');
+    }
+
     // 슬라이드 생성
     console.log(`📊 슬라이드 생성 시작 (분석 ID: ${id})...`);
-    const slides = await generateAllSlides(analysisResult, analysis.image_base64);
+    const slides = await generateAllSlides(analysisResult, imageBase64);
     console.log(`✅ 슬라이드 생성 완료: ${slides.length}개`);
 
-    // Supabase에 슬라이드 저장
+    // 슬라이드를 Storage에 업로드하고 URL 배열 받기
+    const slideUrls = await uploadSlidesToStorage(slides, id);
+    console.log(`✅ 슬라이드 Storage 업로드 완료: ${slideUrls.length}개`);
+
+    // Supabase에 슬라이드 URL 배열 저장
     const { error: updateError } = await supabase
       .from('sleep_analyses')
-      .update({ report_slides: slides })
+      .update({ report_slides: slideUrls })
       .eq('id', id);
 
     if (updateError) {
@@ -721,15 +826,21 @@ app.get('/api/analysis/:id/slides', async (req, res) => {
       });
     }
 
+    // report_slides는 이제 URL 배열 또는 Base64 배열일 수 있음 (하위 호환성)
+    const slides = analysis.report_slides;
+    const isUrlArray = slides.length > 0 && typeof slides[0] === 'string' && slides[0].startsWith('http');
+
     res.json({
       success: true,
       data: {
         analysisId: analysis.id,
-        slides: analysis.report_slides, // Base64 문자열 배열
-        slideCount: analysis.report_slides.length,
+        slides: slides, // Storage URL 배열 또는 Base64 배열 (하위 호환성)
+        slideUrls: isUrlArray ? slides : null, // URL 배열인 경우
+        slideCount: slides.length,
         instagramId: analysis.instagram_id,
         phoneNumber: analysis.phone_number,
-        createdAt: analysis.created_at
+        createdAt: analysis.created_at,
+        isUrlArray: isUrlArray // URL 배열인지 여부
       }
     });
 
@@ -783,10 +894,66 @@ app.get('*', (req, res) => {
   });
 });
 
+/**
+ * Storage 버킷 초기화 (서버 시작 시 실행)
+ */
+async function initializeStorageBucket() {
+  const bucketName = 'sleep-analysis';
+  
+  try {
+    // 버킷 존재 여부 확인
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.warn('⚠️  Storage 버킷 목록 조회 실패:', listError.message);
+      console.warn('   버킷이 자동으로 생성되지 않을 수 있습니다.');
+      return;
+    }
+
+    const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`📦 Storage 버킷 "${bucketName}" 생성 시도 중...`);
+      
+      // 버킷 생성 시도
+      const { data, error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/jpg'],
+        fileSizeLimit: 10485760 // 10MB
+      });
+
+      if (createError) {
+        if (createError.message.includes('already exists')) {
+          console.log(`✅ Storage 버킷 "${bucketName}" 이미 존재함`);
+        } else if (createError.message.includes('permission') || createError.message.includes('unauthorized')) {
+          console.warn('⚠️  Storage 버킷 생성 권한이 없습니다.');
+          console.warn('   Supabase Dashboard에서 수동으로 버킷을 생성해주세요:');
+          console.warn(`   - 이름: ${bucketName}`);
+          console.warn('   - 공개 버킷: 체크');
+          console.warn('   - URL: https://supabase.com/dashboard/project/ugzwgegkvxcczwiottej/storage/buckets');
+        } else {
+          console.warn('⚠️  Storage 버킷 생성 실패:', createError.message);
+          console.warn('   Supabase Dashboard에서 수동으로 버킷을 생성해주세요.');
+        }
+      } else {
+        console.log(`✅ Storage 버킷 "${bucketName}" 생성 완료`);
+      }
+    } else {
+      console.log(`✅ Storage 버킷 "${bucketName}" 확인됨`);
+    }
+  } catch (error) {
+    console.warn('⚠️  Storage 초기화 중 오류:', error.message);
+    console.warn('   버킷이 자동으로 생성되지 않을 수 있습니다.');
+  }
+}
+
 // 서버 시작
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅ Server running at http://0.0.0.0:${PORT}/`);
   console.log(`📡 API endpoints available at http://0.0.0.0:${PORT}/api/`);
   console.log(`🔍 Health check: http://0.0.0.0:${PORT}/api/health`);
   console.log(`🌐 Web app available at http://0.0.0.0:${PORT}/`);
+  
+  // Storage 버킷 초기화
+  await initializeStorageBucket();
 });
