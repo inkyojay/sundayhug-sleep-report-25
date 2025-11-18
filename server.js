@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
+import { generateAllSlides } from './services/serverSlideService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -357,6 +358,18 @@ app.post('/api/analyze-from-url', async (req, res) => {
 
     const ageInMonths = calculateAgeInMonths(birthDate);
 
+    // 슬라이드 생성
+    console.log('📊 슬라이드 생성 시작...');
+    let reportSlides = null;
+    try {
+      const slides = await generateAllSlides(analysisResult, base64String);
+      reportSlides = slides;
+      console.log(`✅ 슬라이드 생성 완료: ${slides.length}개`);
+    } catch (slideError) {
+      console.error('⚠️ 슬라이드 생성 실패:', slideError);
+      // 슬라이드 생성 실패해도 분석 결과는 저장
+    }
+
     // Supabase에 저장
     const { data: savedAnalysis, error: saveError } = await supabase
       .from('sleep_analyses')
@@ -365,7 +378,7 @@ app.post('/api/analyze-from-url', async (req, res) => {
         birth_date: birthDate,
         age_in_months: ageInMonths,
         summary: analysisResult.summary,
-        report_slides: null,
+        report_slides: reportSlides,
         phone_number: phoneNumber || null,
         instagram_id: instagramId || null
       })
@@ -575,6 +588,92 @@ app.post('/api/analyze-and-save', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
+    });
+  }
+});
+
+/**
+ * POST /api/analysis/:id/generate-slides
+ * 분석 결과의 슬라이드 생성 (n8n 연동용)
+ * 
+ * URL 파라미터:
+ * - id: 분석 ID (analysisId)
+ */
+app.post('/api/analysis/:id/generate-slides', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Analysis ID is required'
+      });
+    }
+
+    // Supabase에서 분석 결과 조회
+    const { data: analysis, error: fetchError } = await supabase
+      .from('sleep_analyses')
+      .select('id, image_base64, summary')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !analysis) {
+      return res.status(404).json({
+        success: false,
+        error: 'Analysis not found'
+      });
+    }
+
+    // 피드백 항목 조회
+    const { data: feedbackItems } = await supabase
+      .from('sleep_analysis_feedback_items')
+      .select('id, x, y, title, feedback, risk_level')
+      .eq('sleep_analysis_id', id)
+      .order('id');
+
+    // 분석 결과 재구성
+    const analysisResult = {
+      summary: analysis.summary,
+      feedbackItems: (feedbackItems || []).map(item => ({
+        id: item.id,
+        x: item.x,
+        y: item.y,
+        title: item.title,
+        feedback: item.feedback,
+        riskLevel: item.risk_level
+      })),
+      references: []
+    };
+
+    // 슬라이드 생성
+    console.log(`📊 슬라이드 생성 시작 (분석 ID: ${id})...`);
+    const slides = await generateAllSlides(analysisResult, analysis.image_base64);
+    console.log(`✅ 슬라이드 생성 완료: ${slides.length}개`);
+
+    // Supabase에 슬라이드 저장
+    const { error: updateError } = await supabase
+      .from('sleep_analyses')
+      .update({ report_slides: slides })
+      .eq('id', id);
+
+    if (updateError) {
+      throw new Error(`슬라이드 저장 실패: ${updateError.message}`);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        analysisId: id,
+        slideCount: slides.length,
+        message: '슬라이드가 성공적으로 생성되었습니다.'
+      }
+    });
+
+  } catch (error) {
+    console.error('슬라이드 생성 API 오류:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
     });
   }
 });
