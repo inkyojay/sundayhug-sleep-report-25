@@ -35,6 +35,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Gemini API 초기화
 const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+console.log('🔑 API 키 상태:', {
+  hasGEMINI_API_KEY: !!process.env.GEMINI_API_KEY,
+  hasAPI_KEY: !!process.env.API_KEY,
+  apiKeyLength: apiKey ? apiKey.length : 0,
+  apiKeyPrefix: apiKey ? apiKey.substring(0, 10) + '...' : '없음'
+});
 if (!apiKey) {
   console.warn('⚠️  GEMINI_API_KEY가 설정되지 않았습니다. API 기능이 작동하지 않을 수 있습니다.');
 }
@@ -155,11 +161,19 @@ async function analyzeSleepEnvironment(imageBase64, imageMimeType, birthDate) {
     return parsedResult;
 
   } catch (error) {
-    console.error("Error analyzing image with Gemini:", error);
-    console.error("Error details:", {
+    console.error("❌ Error analyzing image with Gemini:", error);
+    console.error("📋 Error details:", {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
+      code: error.code,
+      status: error.status,
+      statusCode: error.statusCode,
+      response: error.response ? {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      } : undefined
     });
     
     if (error instanceof SyntaxError) {
@@ -168,8 +182,23 @@ async function analyzeSleepEnvironment(imageBase64, imageMimeType, birthDate) {
     
     // 더 자세한 에러 메시지 제공
     const errorMessage = error.message || 'Unknown error';
-    if (errorMessage.includes('API key') || errorMessage.includes('authentication')) {
-      throw new Error("API 키 인증에 실패했습니다. 서버 설정을 확인해주세요.");
+    const errorCode = error.code || error.status || error.statusCode || '';
+    
+    console.error("🔍 에러 분석:", {
+      errorMessage,
+      errorCode,
+      includesAPIKey: errorMessage.includes('API key') || errorMessage.includes('authentication'),
+      includesInvalid: errorMessage.includes('invalid') || errorMessage.includes('format'),
+      includesSize: errorMessage.includes('size') || errorMessage.includes('too large')
+    });
+    
+    if (errorMessage.includes('API key') || errorMessage.includes('authentication') || errorCode === 401 || errorCode === 403) {
+      console.error("🚨 API 키 인증 실패 - API 키 상태:", {
+        hasApiKey: !!apiKey,
+        apiKeyLength: apiKey ? apiKey.length : 0,
+        apiKeyPrefix: apiKey ? apiKey.substring(0, 15) + '...' : '없음'
+      });
+      throw new Error(`API 키 인증에 실패했습니다. 서버 설정을 확인해주세요. (에러 코드: ${errorCode || 'N/A'}, 메시지: ${errorMessage})`);
     }
     if (errorMessage.includes('invalid') || errorMessage.includes('format')) {
       throw new Error("이미지 형식이 올바르지 않습니다. JPEG, PNG 형식의 이미지를 사용해주세요.");
@@ -287,8 +316,15 @@ app.post('/api/analyze-from-url', async (req, res) => {
       });
     }
 
-    console.log('이미지 URL 받음:', imageUrl);
-    console.log('생년월일:', birthDate);
+    console.log('📥 이미지 URL 분석 요청 받음');
+    console.log('  - 이미지 URL:', imageUrl.substring(0, 100) + '...');
+    console.log('  - 생년월일:', birthDate);
+    console.log('  - 전화번호:', phoneNumber || '없음');
+    console.log('  - 인스타그램 ID:', instagramId || '없음');
+    console.log('  - API 키 상태:', {
+      hasApiKey: !!apiKey,
+      apiKeyLength: apiKey ? apiKey.length : 0
+    });
 
     // 이미지 URL에서 이미지 다운로드
     const imageResponse = await fetch(imageUrl);
@@ -388,11 +424,26 @@ app.post('/api/analyze-from-url', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('이미지 URL 분석 API 오류:', error);
-    console.error('오류 스택:', error.stack);
-    res.status(500).json({
+    console.error('❌ 이미지 URL 분석 API 오류:', error);
+    console.error('📋 오류 상세:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      status: error.status
+    });
+    
+    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+    const statusCode = error.status || error.statusCode || 500;
+    
+    res.status(statusCode).json({
       success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        code: error.code,
+        status: error.status
+      } : undefined
     });
   }
 });
