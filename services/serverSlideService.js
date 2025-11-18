@@ -27,8 +27,28 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 }
 
 // 한글 폰트 설정
+// 폰트 파일이 있으면 로드, 없으면 시스템 폰트 사용
+let FONT_LOADED = false;
+const fontPath = path.join(__dirname, '../fonts/NotoSansKR-Regular.ttf');
+const fontBoldPath = path.join(__dirname, '../fonts/NotoSansKR-Bold.ttf');
+
+try {
+  if (fs.existsSync(fontPath)) {
+    registerFont(fontPath, { family: 'Noto Sans KR' });
+    FONT_LOADED = true;
+    console.log('✅ 한글 폰트 파일 로드 성공: NotoSansKR-Regular.ttf');
+  }
+  if (fs.existsSync(fontBoldPath)) {
+    registerFont(fontBoldPath, { family: 'Noto Sans KR', weight: 'bold' });
+    console.log('✅ 한글 폰트 파일 로드 성공: NotoSansKR-Bold.ttf');
+  }
+} catch (error) {
+  console.warn('⚠️ 폰트 파일 로드 실패:', error.message);
+  console.warn('   시스템 폰트를 사용합니다.');
+}
+
 // 서버 환경에서 사용 가능한 한글 폰트 (우선순위 순)
-const KOREAN_FONT = 'Noto Sans CJK KR, NanumGothic, AppleGothic, Malgun Gothic, sans-serif';
+const KOREAN_FONT_FALLBACK = 'Noto Sans CJK KR, NanumGothic, AppleGothic, Malgun Gothic, sans-serif';
 
 // 폰트 헬퍼 함수
 function setKoreanFont(ctx, size, weight = 'normal') {
@@ -36,10 +56,13 @@ function setKoreanFont(ctx, size, weight = 'normal') {
     'normal': 'normal',
     '500': '500',
     'bold': 'bold',
-    '900': '900'
+    '900': 'bold' // 900은 bold로 매핑
   };
   const fontWeight = weightMap[weight] || 'normal';
-  ctx.font = `${fontWeight} ${size}px ${KOREAN_FONT}`;
+  
+  // 폰트 파일이 로드되었으면 'Noto Sans KR' 사용, 아니면 시스템 폰트 사용
+  const fontFamily = FONT_LOADED ? 'Noto Sans KR' : KOREAN_FONT_FALLBACK;
+  ctx.font = `${fontWeight} ${size}px ${fontFamily}`;
 }
 
 /**
