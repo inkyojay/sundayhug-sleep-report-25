@@ -26,7 +26,7 @@ URL은 올바른데 "API 키 인증에 실패했습니다" 에러가 발생합�
 
 1. **Variables 탭 확인**
    - `GEMINI_API_KEY`가 있는지 확인
-   - 값이 올바른지 확인: `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg`
+   - 값이 올바른지 확인 (새로 생성한 API 키)
 
 2. **환경 변수가 있다면**
    - **Edit** 클릭하여 값 확인
@@ -82,7 +82,7 @@ n8n에서 헬스 체크 API 호출:
 2. `GEMINI_API_KEY` 삭제 (있다면)
 3. **New Variable** 클릭
 4. Key: `GEMINI_API_KEY`
-5. Value: `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg`
+5. Value: `YOUR_NEW_GEMINI_API_KEY` (새로 생성한 API 키)
 6. **Add** 클릭
 7. **Redeploy** 클릭
 
@@ -152,9 +152,9 @@ Gemini API 키가 유효한지 확인:
 
 ### 환경 변수 값 형식
 
-- ✅ 올바름: `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg`
-- ❌ 잘못됨: `"AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg"` (따옴표 포함)
-- ❌ 잘못됨: ` AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg ` (공백 포함)
+- ✅ 올바름: `YOUR_NEW_GEMINI_API_KEY` (공백 없음)
+- ❌ 잘못됨: `"YOUR_NEW_GEMINI_API_KEY"` (따옴표 포함)
+- ❌ 잘못됨: ` YOUR_NEW_GEMINI_API_KEY ` (공백 포함)
 
 ---
 

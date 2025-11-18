@@ -57,7 +57,7 @@ https://ugzwgegkvxcczwiottej.supabase.co/functions/v1/sleep-analysis-api
 프로젝트 루트에 `.env.local` 파일 생성:
 
 ```env
-GEMINI_API_KEY=AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg
+GEMINI_API_KEY=YOUR_NEW_GEMINI_API_KEY
 VITE_SUPABASE_URL=https://ugzwgegkvxcczwiottej.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnendnZWdrdnhjY3p3aW90dGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MTI2NzAsImV4cCI6MjA3NzI4ODY3MH0._ezV2r8kAvjIlovx6U_L0XzW9nWtSR0MY-RpMISPK38
 ```

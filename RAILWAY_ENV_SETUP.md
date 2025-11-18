@@ -31,7 +31,7 @@
 2. **New Variable** 클릭
 3. 다음 정보 입력:
    - **Key**: `GEMINI_API_KEY`
-   - **Value**: `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg` (실제 API 키)
+   - **Value**: `YOUR_NEW_GEMINI_API_KEY` (새로 생성한 API 키)
 4. **Add** 클릭
 
 **환경 변수가 있는 경우:**
@@ -56,7 +56,7 @@ Railway에 다음 환경 변수들이 모두 설정되어 있어야 합니다:
 
 | 변수 이름 | 설명 | 예시 값 |
 |---------|------|---------|
-| `GEMINI_API_KEY` | Google Gemini API 키 | `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg` |
+| `GEMINI_API_KEY` | Google Gemini API 키 | `YOUR_NEW_GEMINI_API_KEY` |
 | `VITE_SUPABASE_URL` | Supabase 프로젝트 URL | `https://ugzwgegkvxcczwiottej.supabase.co` |
 | `VITE_SUPABASE_ANON_KEY` | Supabase Anon Key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 

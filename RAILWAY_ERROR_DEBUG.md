@@ -76,7 +76,7 @@
 2. **New Variable** 클릭
 3. 다음 입력:
    - **Key**: `GEMINI_API_KEY`
-   - **Value**: `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg`
+   - **Value**: `YOUR_NEW_GEMINI_API_KEY` (새로 생성한 API 키)
 4. **Add** 클릭
 5. 서버 자동 재배포 대기 (1-2분)
 

@@ -19,7 +19,7 @@
 
 ```env
 # Gemini API
-GEMINI_API_KEY=AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg
+GEMINI_API_KEY=YOUR_NEW_GEMINI_API_KEY
 
 # Supabase (선택사항 - 기본값이 설정되어 있음)
 VITE_SUPABASE_URL=https://ugzwgegkvxcczwiottej.supabase.co

@@ -129,7 +129,7 @@ return items;
 ## 🔧 Railway 설정
 
 ### 필수 환경 변수
-- `GEMINI_API_KEY`: `AIzaSyCFsqf1907hg8yTxyw-RcDp2dseHnuJawg`
+- `GEMINI_API_KEY`: `YOUR_NEW_GEMINI_API_KEY` (새로 생성 필요)
 - `VITE_SUPABASE_URL`: `https://ugzwgegkvxcczwiottej.supabase.co`
 - `VITE_SUPABASE_ANON_KEY`: (Supabase Anon Key)
 
