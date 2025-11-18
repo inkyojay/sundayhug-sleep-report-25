@@ -26,8 +26,21 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.closePath();
 }
 
-// 폰트 로드 (선택사항 - 시스템 폰트 사용)
-// registerFont(path.join(__dirname, '../fonts/NotoSansKR-Regular.ttf'), { family: 'Noto Sans KR' });
+// 한글 폰트 설정
+// 서버 환경에서 사용 가능한 한글 폰트 (우선순위 순)
+const KOREAN_FONT = 'Noto Sans CJK KR, NanumGothic, AppleGothic, Malgun Gothic, sans-serif';
+
+// 폰트 헬퍼 함수
+function setKoreanFont(ctx, size, weight = 'normal') {
+  const weightMap = {
+    'normal': 'normal',
+    '500': '500',
+    'bold': 'bold',
+    '900': '900'
+  };
+  const fontWeight = weightMap[weight] || 'normal';
+  ctx.font = `${fontWeight} ${size}px ${KOREAN_FONT}`;
+}
 
 /**
  * 슬라이드 0: 인트로 페이지
@@ -42,18 +55,18 @@ export async function createSlide0() {
 
   // 헤더
   ctx.fillStyle = '#2d2d2d';
-  ctx.font = 'bold 28px Arial';
+  setKoreanFont(ctx, 28, 'bold');
   ctx.fillText('@sundayhug.kr', 60, 60);
   ctx.fillText('1/10', INSTAGRAM_WIDTH - 60 - ctx.measureText('1/10').width, 60);
 
   // 메인 텍스트
   ctx.fillStyle = '#6B4E3D';
-  ctx.font = '500 42px Arial';
+  setKoreanFont(ctx, 42, '500');
   const line1 = '썬데이허그와 함께하는';
   ctx.fillText(line1, (INSTAGRAM_WIDTH - ctx.measureText(line1).width) / 2, 400);
 
   ctx.fillStyle = '#2d2d2d';
-  ctx.font = '900 90px Arial';
+  setKoreanFont(ctx, 90, '900');
   const lines = ['우리아기', '안전한 수면환경', '만들기'];
   let y = 500;
   lines.forEach(line => {
@@ -70,7 +83,7 @@ export async function createSlide0() {
   ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
   
   ctx.fillStyle = 'white';
-  ctx.font = '500 32px Arial';
+  setKoreanFont(ctx, 32, '500');
   const buttonText = '수면 환경 분석 레포트';
   ctx.fillText(buttonText, (INSTAGRAM_WIDTH - ctx.measureText(buttonText).width) / 2, buttonY + 50);
 
@@ -90,12 +103,12 @@ export async function createSlide1(imageBase64, feedbackItems) {
 
   // 헤더
   ctx.fillStyle = '#2d2d2d';
-  ctx.font = '500 28px Arial';
+  setKoreanFont(ctx, 28, '500');
   ctx.fillText('@sundayhug.kr', 60, 60);
   ctx.fillText('2/10', INSTAGRAM_WIDTH - 60 - ctx.measureText('2/10').width, 60);
 
   // 제목
-  ctx.font = 'bold 52px Arial';
+  setKoreanFont(ctx, 52, 'bold');
   ctx.fillText('종합 요약', 60, 150);
 
   // 이미지 로드 및 그리기
@@ -148,7 +161,7 @@ export async function createSlide1(imageBase64, feedbackItems) {
 
     // 번호 텍스트
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 32px Arial';
+    setKoreanFont(ctx, 32, 'bold');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(item.id.toString(), pinX, pinY);
@@ -172,12 +185,12 @@ export async function createSlide2(summary) {
 
   // 헤더
   ctx.fillStyle = '#2d2d2d';
-  ctx.font = '500 28px Arial';
+  setKoreanFont(ctx, 28, '500');
   ctx.fillText('@sundayhug.kr', 60, 60);
   ctx.fillText('3/10', INSTAGRAM_WIDTH - 60 - ctx.measureText('3/10').width, 60);
 
   // 제목
-  ctx.font = 'bold 52px Arial';
+  setKoreanFont(ctx, 52, 'bold');
   ctx.fillText('종합 요약', 60, 150);
 
   // 요약 텍스트 박스
@@ -196,7 +209,7 @@ export async function createSlide2(summary) {
 
   // 텍스트
   ctx.fillStyle = '#2d2d2d';
-  ctx.font = '32px Arial';
+  setKoreanFont(ctx, 32, 'normal');
   ctx.textAlign = 'left';
   
   // 텍스트 줄바꿈 처리
@@ -240,12 +253,12 @@ export async function createFeedbackSlide(items, startIndex, slideNumber) {
 
   // 헤더
   ctx.fillStyle = '#2d2d2d';
-  ctx.font = '500 28px Arial';
+  setKoreanFont(ctx, 28, '500');
   ctx.fillText('@sundayhug.kr', 60, 60);
   ctx.fillText(`${slideNumber}/10`, INSTAGRAM_WIDTH - 60 - ctx.measureText(`${slideNumber}/10`).width, 60);
 
   // 제목
-  ctx.font = 'bold 52px Arial';
+  setKoreanFont(ctx, 52, 'bold');
   ctx.fillText('상세 분석', 60, 150);
 
   // 피드백 항목 그리기 (최대 2개)
@@ -296,7 +309,7 @@ export async function createFeedbackSlide(items, startIndex, slideNumber) {
 
     // 번호 텍스트
     ctx.fillStyle = 'white';
-    ctx.font = 'bold 32px Arial';
+    setKoreanFont(ctx, 32, 'bold');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(item.id.toString(), circleX, circleY);
@@ -305,16 +318,16 @@ export async function createFeedbackSlide(items, startIndex, slideNumber) {
 
     // 제목
     ctx.fillStyle = textColors[item.riskLevel] || '#1565C0';
-    ctx.font = 'bold 38px Arial';
+    setKoreanFont(ctx, 38, 'bold');
     ctx.fillText(item.title, circleX + 50, y + 45);
 
     // 위험도
-    ctx.font = '26px Arial';
+    setKoreanFont(ctx, 26, 'normal');
     ctx.fillText(`위험도: ${item.riskLevel}`, circleX + 50, y + 85);
 
     // 피드백 텍스트
     ctx.fillStyle = '#2d2d2d';
-    ctx.font = '30px Arial';
+    setKoreanFont(ctx, 30, 'normal');
     const feedbackY = y + 130;
     const feedbackMaxWidth = itemWidth - 150;
     const feedbackLineHeight = 45;
