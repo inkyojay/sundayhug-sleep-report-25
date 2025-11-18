@@ -264,6 +264,140 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 /**
+ * POST /api/analyze-from-url
+ * 이미지 URL을 받아서 분석 및 저장 (n8n 연동용 - Tally 이미지 처리)
+ * 
+ * Request Body:
+ * {
+ *   "imageUrl": "https://storage.tally.so/private/image.jpeg?...",
+ *   "birthDate": "2024-01-15",
+ *   "phoneNumber": "010-1234-5678" (선택사항),
+ *   "instagramId": "@instagram_id" (선택사항)
+ * }
+ */
+app.post('/api/analyze-from-url', async (req, res) => {
+  try {
+    const { imageUrl, birthDate, phoneNumber, instagramId } = req.body;
+
+    // 입력 검증
+    if (!imageUrl || !birthDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'imageUrl and birthDate are required'
+      });
+    }
+
+    console.log('이미지 URL 받음:', imageUrl);
+    console.log('생년월일:', birthDate);
+
+    // 이미지 URL에서 이미지 다운로드
+    const imageResponse = await fetch(imageUrl);
+    
+    if (!imageResponse.ok) {
+      throw new Error(`이미지 다운로드 실패: ${imageResponse.status} ${imageResponse.statusText}`);
+    }
+
+    // 바이너리 데이터로 변환
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const buffer = Buffer.from(imageBuffer);
+    
+    // MIME 타입 확인
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    
+    console.log('이미지 다운로드 성공:', {
+      크기: buffer.length,
+      MIME타입: contentType
+    });
+    
+    // Base64로 변환
+    const base64String = buffer.toString('base64');
+
+    // 분석 수행
+    const analysisResult = await analyzeSleepEnvironment(
+      base64String,
+      contentType,
+      birthDate
+    );
+
+    const ageInMonths = calculateAgeInMonths(birthDate);
+
+    // Supabase에 저장
+    const { data: savedAnalysis, error: saveError } = await supabase
+      .from('sleep_analyses')
+      .insert({
+        image_base64: base64String,
+        birth_date: birthDate,
+        age_in_months: ageInMonths,
+        summary: analysisResult.summary,
+        report_slides: null,
+        phone_number: phoneNumber || null,
+        instagram_id: instagramId || null
+      })
+      .select()
+      .single();
+
+    if (saveError) {
+      throw new Error(`데이터 저장 실패: ${saveError.message}`);
+    }
+
+    // 피드백 항목 저장
+    if (analysisResult.feedbackItems && analysisResult.feedbackItems.length > 0) {
+      const feedbackItems = analysisResult.feedbackItems.map(item => ({
+        sleep_analysis_id: savedAnalysis.id,
+        x: item.x,
+        y: item.y,
+        title: item.title,
+        feedback: item.feedback,
+        risk_level: item.riskLevel
+      }));
+
+      const { error: feedbackError } = await supabase
+        .from('sleep_analysis_feedback_items')
+        .insert(feedbackItems);
+
+      if (feedbackError) {
+        console.error('피드백 항목 저장 오류:', feedbackError);
+      }
+    }
+
+    // 참고 자료 저장
+    if (analysisResult.references && analysisResult.references.length > 0) {
+      const references = analysisResult.references.map(ref => ({
+        sleep_analysis_id: savedAnalysis.id,
+        title: ref.title,
+        uri: ref.uri
+      }));
+
+      const { error: refError } = await supabase
+        .from('sleep_analysis_references')
+        .insert(references);
+
+      if (refError) {
+        console.error('참고 자료 저장 오류:', refError);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...analysisResult,
+        phoneNumber: phoneNumber || null,
+        instagramId: instagramId || null
+      },
+      analysisId: savedAnalysis.id
+    });
+
+  } catch (error) {
+    console.error('이미지 URL 분석 API 오류:', error);
+    console.error('오류 스택:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
+    });
+  }
+});
+
+/**
  * POST /api/analyze-and-save
  * 이미지 분석 후 Supabase에 저장 (n8n 연동용)
  * 
